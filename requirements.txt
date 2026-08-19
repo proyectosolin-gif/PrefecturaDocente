@@ -1,6 +1,6 @@
 streamlit
-opencv-python-headless
-numpy
+streamlit-qrcode-scanner
+pydantic==1.10.13
 pandas
 SQLAlchemy
 pyodbc
