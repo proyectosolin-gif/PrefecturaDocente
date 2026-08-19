@@ -1,0 +1,5 @@
+streamlit
+streamlit-qrcode-scanner
+pandas
+SQLAlchemy
+pyodbc
