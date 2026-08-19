@@ -1,5 +1,6 @@
 streamlit
-streamlit-qrcode-scanner
+opencv-python-headless
+numpy
 pandas
 SQLAlchemy
 pyodbc
