@@ -33,6 +33,15 @@ def obtener_contexto_tiempo_mexico():
     return fecha_str, hora_str, hora_corta, dia_semana
 
 
+# Mapeo de IDs de acción a texto legible
+DICCIONARIO_ACCIONES = {
+    1: '🟢 ASISTENCIA',
+    2: '🔴 FALTA',
+    3: '🟡 RETARDO',
+    4: '🔵 COMISIÓN'
+}
+
+
 # ==============================================================================
 # APLICACIÓN PRINCIPAL - ESCANEO AUTOMÁTICO Y REGISTRO EN BD
 # ==============================================================================
@@ -179,14 +188,49 @@ def app_prefectura_auto_qr():
             unsafe_allow_html=True,
         )
 
-        # Guardar en sesión los datos clave
+        # --------------------------------------------------------------
+        # 7. VALIDACIÓN ANTI-DUPLICADOS (VERIFICAR SI YA SE CAPTURÓ HOY)
+        # --------------------------------------------------------------
+        query_existe = text("""
+            SELECT idaccion, hora 
+            FROM asistencia_prefectura 
+            WHERE idmaestro = :idmaestro 
+              AND idmateria = :idmateria 
+              AND fecha = :fecha
+        """)
+
+        with engine.connect() as conn:
+            registro_existente = conn.execute(
+                query_existe,
+                {
+                    'idmaestro': res_clase.idmaestro,
+                    'idmateria': res_clase.idmateria,
+                    'fecha': fecha_act
+                }
+            ).fetchone()
+
+        if registro_existente:
+            accion_nombre = DICCIONARIO_ACCIONES.get(registro_existente.idaccion, 'REGISTRADO')
+            st.warning(
+                f'⚠️ **Esta clase ya fue registrada hoy.**\n\n'
+                f'* **Estatus registrado:** {accion_nombre}\n'
+                f'* **Hora de registro:** {registro_existente.hora}'
+            )
+            
+            if st.button('🔄 Escanear otra aula', type='primary', use_container_width=True):
+                if 'escanner_aula_auto' in st.session_state:
+                    del st.session_state['escanner_aula_auto']
+                st.rerun()
+            st.stop()
+
+        # Guardar en sesión los datos clave si no hay duplicado
         st.session_state['datos_clase_actual'] = {
             'idmaestro': res_clase.idmaestro,
             'idmateria': res_clase.idmateria
         }
 
         # --------------------------------------------------------------
-        # 7. BOTONES DE CAPTURA RÁPIDA (OPCIONES DE ASISTENCIA)
+        # 8. BOTONES DE CAPTURA RÁPIDA (OPCIONES DE ASISTENCIA)
         # --------------------------------------------------------------
         st.subheader('⚡ Registrar Estatus en el Aula:')
 
@@ -220,12 +264,11 @@ def app_prefectura_auto_qr():
                 id_accion_elegida = 4
 
         # --------------------------------------------------------------
-        # 8. GUARDADO EN BASE DE DATOS (tabla: asistencia_prefectura)
+        # 9. GUARDADO EN BASE DE DATOS (tabla: asistencia_prefectura)
         # --------------------------------------------------------------
         if id_accion_elegida:
             clase = st.session_state.get('datos_clase_actual')
             
-            # Inserción estándar en la tabla 'asistencia_prefectura'
             query_insert = text("""
                 INSERT INTO asistencia_prefectura (idmaestro, idmateria, fecha, hora, idaccion)
                 VALUES (:idmaestro, :idmateria, :fecha, :hora, :idaccion)
